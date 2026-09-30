@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="shopify-api-key" content="722bcc5d2d9b5af85cb667d5d7f7a0ce">
+<script src="https://cdn.shopify.com/shopifycloud/app-bridge.js"></script>
+<title>Humasana Connector</title>
+<style>
+  :root {
+    --bg: #f1f1f1; --card: #fff; --text: #303030; --muted: #616161; --border: #e3e3e3;
+    --ok-bg: #cdfee1; --ok: #0c5132; --warn-bg: #fff1e3; --warn: #5e4200; --bad-bg: #fee9e8; --bad: #8e1f0b;
+    --info-bg: #eaf4ff; --info: #00527c; --neutral-bg: #f0f0f0; --accent: #303030;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 13px/1.45 -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
+  .card { background: var(--card); border-radius: 12px; box-shadow: 0 1px 0 rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.04); padding: 16px; }
+  h2 { font-size: 14px; font-weight: 650; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  h2 small { font-weight: 450; color: var(--muted); }
+  .status { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+  .status b { font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; background: #29845a; }
+  .dot.bad { background: #c70a24; } .dot.warn { background: #b28400; }
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+  .kpi { background: var(--card); border-radius: 12px; padding: 14px 16px; box-shadow: 0 1px 0 rgba(0,0,0,.07), 0 0 0 1px rgba(0,0,0,.04); }
+  .kpi .label { color: var(--muted); font-size: 12px; }
+  .kpi .value { font-size: 22px; font-weight: 650; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .kpi .sub { color: var(--muted); font-size: 12px; }
+  .kpi.alert .value { color: var(--bad); }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 550; color: var(--muted); font-size: 12px; padding: 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  td.num, th.num { text-align: right; }
+  .scroll { overflow-x: auto; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 8px; font-size: 12px; font-weight: 550; white-space: nowrap; background: var(--neutral-bg); }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); } .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); } .pill.info { background: var(--info-bg); color: var(--info); }
+  .muted { color: var(--muted); } .err { color: var(--bad); font-size: 12px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+  .tabs button { border: 0; background: transparent; padding: 6px 10px; border-radius: 8px; font: inherit; color: var(--muted); cursor: pointer; }
+  .tabs button[aria-pressed="true"] { background: var(--neutral-bg); color: var(--text); font-weight: 600; }
+  input[type=search] { flex: 1; min-width: 160px; padding: 6px 10px; border: 1px solid #8a8a8a; border-radius: 8px; font: inherit; }
+  a { color: #005bd3; text-decoration: none; white-space: nowrap; } a:hover { text-decoration: underline; }
+  .empty { padding: 24px; text-align: center; color: var(--muted); }
+  #loading, #fatal { padding: 48px 16px; text-align: center; color: var(--muted); }
+  #fatal { color: var(--bad); }
+  details summary { cursor: pointer; font-weight: 600; }
+  @media (max-width: 640px) { .hide-sm { display: none; } }
+</style>
+</head>
+<body>
+<ui-title-bar title="Humasana Connector">
+  <button variant="primary" id="sync-btn" onclick="syncNow()">Sync now</button>
+</ui-title-bar>
+
+<div id="loading">Loading connector status…</div>
+<div id="fatal" hidden></div>
+
+<main id="app" hidden>
+  <section class="card"><div class="status" id="status"></div></section>
+  <section class="kpis" id="kpis"></section>
+  <section class="card" id="attention-card" hidden>
+    <h2>Needs attention</h2>
+    <div class="scroll"><table id="attention"></table></div>
+  </section>
+  <section class="card">
+    <h2>Orders <small id="orders-note"></small></h2>
+    <div class="toolbar">
+      <div class="tabs" id="tabs">
+        <button data-f="all" aria-pressed="true">All</button>
+        <button data-f="webhook">Live</button>
+        <button data-f="open">Awaiting shipment</button>
+        <button data-f="import">Imported</button>
+      </div>
+      <input type="search" id="q" placeholder="Search order number, Shopify order, tracking">
+    </div>
+    <div class="scroll"><table id="orders"></table></div>
+  </section>
+  <section class="card">
+    <h2>Stock sync to Humasana <small id="stock-note"></small></h2>
+    <div class="scroll"><table id="products"></table></div>
+  </section>
+  <section class="card">
+    <details><summary>Recent API errors</summary><div class="scroll" style="margin-top:8px"><table id="errors"></table></div></details>
+  </section>
+</main>
+
+<script>
+const API = "https://xtgehmhqueycroypzpcf.supabase.co/functions/v1/humasana-dashboard";
+const TZ = "Europe/Amsterdam";
+let data = null, filter = "all";
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const eur = (n) => new Intl.NumberFormat("nl-NL", { style: "currency", currency: "EUR" }).format(Number(n) || 0);
+const fmt = (d, withTime = true) => d ? new Intl.DateTimeFormat("nl-NL", { timeZone: TZ, day: "2-digit", month: "2-digit", year: withTime ? undefined : "numeric", hour: withTime ? "2-digit" : undefined, minute: withTime ? "2-digit" : undefined }).format(new Date(d)) : "—";
+function ago(d) {
+  if (!d) return "never";
+  const m = Math.round((Date.now() - new Date(d).getTime()) / 60000);
+  if (m < 1) return "just now"; if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60); if (h < 48) return `${h} h ago`;
+  return `${Math.round(h / 24)} days ago`;
+}
+
+const STATUS = {
+  received: ["Received", "info"], processing: ["Creating…", "info"], created: ["Awaiting shipment", "warn"],
+  shipped: ["Shipped", "ok"], failed: ["Retrying", "warn"], needs_attention: ["Needs attention", "bad"],
+  shopify_cancelled: ["Cancelled in Shopify", "bad"], cancelled_by_humasana: ["Cancelled by Humasana", "bad"], skipped: ["Skipped", ""],
+};
+const pill = (s) => { const [l, c] = STATUS[s] ?? [s, ""]; return `<span class="pill ${c}">${esc(l)}</span>`; };
+const shopifyLink = (o) => o.shopify_id ? `<a href="shopify://admin/orders/${esc(o.shopify_id)}" target="_top">${esc(o.shopify_order_name)}</a>` : `<span class="muted">—</span>`;
+
+async function api(method = "GET", query = "") {
+  const token = await shopify.idToken();
+  const res = await fetch(API + query, { method, headers: { Authorization: `Bearer ${token}` } });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  return body;
+}
+
+function renderStatus() {
+  const c = data.connection, s = data.settings || {}, w = data.worker || {};
+  const workerAge = w.last_run ? (Date.now() - new Date(w.last_run).getTime()) / 60000 : Infinity;
+  const workerOk = w.status === "succeeded" && workerAge < 15;
+  const mode = s.stock_sync_mode;
+  document.getElementById("status").innerHTML = `
+    <span><span class="dot ${c ? "" : "bad"}"></span>${c ? `Connected to Humasana · partner <b>${esc(c.partner_id)}</b>` : "<b>Not paired with Humasana</b>"}</span>
+    <span><span class="dot ${workerOk ? "" : "warn"}"></span>Last sync run <b>${ago(w.last_run)}</b></span>
+    <span><span class="dot ${mode === "live" ? "" : "warn"}"></span>Stock sync <b>${esc(mode)}</b> · last ${ago(s.stock_last_run_at)}</span>
+    <span class="muted">Paired ${fmt(c?.paired_at)}</span>`;
+}
+
+function renderKpis() {
+  const k = data.counts;
+  const cards = [
+    ["Live orders (30 days)", k.webhook_30d, eur(k.revenue_30d)],
+    ["Awaiting shipment", k.awaiting_shipment, "in Shopify / Monta"],
+    ["Shipped", k.shipped, "tracking sent or imported"],
+    ["Needs attention", k.attention, k.attention ? "see list below" : "all good", k.attention > 0],
+    ["Imported history", k.import, k.import_pending ? `${k.import_pending} still queued` : "complete"],
+  ];
+  document.getElementById("kpis").innerHTML = cards.map(([l, v, sub, alert]) =>
+    `<div class="kpi ${alert ? "alert" : ""}"><div class="label">${esc(l)}</div><div class="value">${esc(v)}</div><div class="sub">${esc(sub)}</div></div>`).join("");
+}
+
+function renderAttention() {
+  const rows = data.attention || [];
+  document.getElementById("attention-card").hidden = !rows.length;
+  document.getElementById("attention").innerHTML = `<tr><th>Humasana order</th><th>Status</th><th>Shopify</th><th>What happened</th></tr>` +
+    rows.map((r) => `<tr><td>${esc(r.order_number)}<br><span class="muted">${esc(r.humasana_id)}</span></td><td>${pill(r.status)}</td>
+      <td>${esc(r.shopify ?? "—")}</td><td class="err">${esc(r.error || (r.status === "created" ? "Contains a SKU that is not in Shopify — check manually" : ""))}</td></tr>`).join("");
+}
+
+function renderOrders() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = (data.orders || []).filter((o) => {
+    if (filter === "webhook" && o.source !== "webhook") return false;
+    if (filter === "import" && o.source !== "import") return false;
+    if (filter === "open" && !["received", "processing", "created"].includes(o.status)) return false;
+    if (q && ![o.order_number, o.humasana_id, o.shopify_order_name, o.tracking].some((v) => String(v ?? "").toLowerCase().includes(q))) return false;
+    return true;
+  });
+  document.getElementById("orders-note").textContent = `${rows.length} shown · latest 150`;
+  document.getElementById("orders").innerHTML = rows.length ? `<tr><th>Ordered</th><th>Humasana order</th><th>Shopify</th><th>Status</th>
+      <th class="hide-sm">Country</th><th class="num">Items</th><th class="num">Total</th><th class="hide-sm">Tracking</th><th class="hide-sm">Source</th></tr>` +
+    rows.map((o) => `<tr>
+      <td>${fmt(o.ordered_at)}</td>
+      <td>${esc(o.order_number)}<br><span class="muted">${esc(o.humasana_id)}</span></td>
+      <td>${shopifyLink(o)}</td>
+      <td>${pill(o.status)}${o.last_error ? `<div class="err">${esc(o.last_error).slice(0, 160)}</div>` : ""}${o.unmatched_skus ? `<div class="err">Not in Shopify: ${esc(o.unmatched_skus.join(", "))}</div>` : ""}</td>
+      <td class="hide-sm">${esc((o.country || "").toUpperCase())}</td>
+      <td class="num">${esc(o.items)}</td>
+      <td class="num">${eur(o.total)}</td>
+      <td class="hide-sm">${esc(o.tracking || "—")}</td>
+      <td class="hide-sm"><span class="pill ${o.source === "webhook" ? "info" : ""}">${o.source === "webhook" ? "Live" : "Imported"}</span></td>
+    </tr>`).join("") : `<tr><td class="empty">No orders match.</td></tr>`;
+}
+
+function renderProducts() {
+  const s = data.settings || {};
+  document.getElementById("stock-note").textContent = `Monta stock · in stock above ${s.stock_buffer ?? 5} units · checked hourly, full resync daily`;
+  document.getElementById("products").innerHTML = `<tr><th>SKU</th><th>Product</th><th class="num">Humasana price</th><th class="num">Monta available</th><th>On Humasana</th><th class="hide-sm">Last synced</th></tr>` +
+    (data.products || []).map((p) => {
+      const st = !p.enabled ? `<span class="pill">Sync off</span>` : p.status === "in_stock" ? `<span class="pill ok">In stock</span>` : p.status === "out_of_stock" ? `<span class="pill bad">Out of stock</span>` : `<span class="pill">Not sent yet</span>`;
+      return `<tr><td>${esc(p.sku)}</td><td>${esc(p.title)}${p.error ? `<div class="err">${esc(p.error)}</div>` : ""}</td>
+        <td class="num">${eur(p.price)}</td><td class="num">${p.available ?? "—"}</td><td>${st}</td><td class="hide-sm">${fmt(p.synced_at)}</td></tr>`;
+    }).join("");
+}
+
+function renderErrors() {
+  const rows = data.errors || [];
+  document.getElementById("errors").innerHTML = rows.length ? `<tr><th>When</th><th>Call</th><th>HTTP</th></tr>` +
+    rows.map((e) => `<tr><td>${fmt(e.at)}</td><td>${esc(e.direction)} ${esc(e.url || "")}</td><td>${esc(e.status)}</td></tr>`).join("")
+    : `<tr><td class="empty">No errors logged.</td></tr>`;
+}
+
+function render() { renderStatus(); renderKpis(); renderAttention(); renderOrders(); renderProducts(); renderErrors(); }
+
+async function load() {
+  try {
+    data = await api();
+    render();
+    document.getElementById("loading").hidden = true;
+    document.getElementById("app").hidden = false;
+  } catch (e) {
+    document.getElementById("loading").hidden = true;
+    const f = document.getElementById("fatal");
+    f.hidden = false;
+    f.textContent = `Could not load connector status: ${e.message}`;
+  }
+}
+
+async function syncNow() {
+  const btn = document.getElementById("sync-btn");
+  btn.setAttribute("loading", "");
+  try {
+    const r = await api("POST", "?action=sync");
+    const created = (r.result?.orders || []).filter((o) => o.shopify).length;
+    const tracked = (r.result?.tracking?.results || []).filter((t) => t.tracking && !t.error).length;
+    const stock = (r.result?.stock?.changes || []).length;
+    shopify.toast.show(r.result?.skipped ? "A sync is already running" : `Synced · ${created} orders, ${tracked} tracking, ${stock} stock updates`);
+    await load();
+  } catch (e) {
+    shopify.toast.show(`Sync failed: ${e.message}`, { isError: true });
+  } finally {
+    btn.removeAttribute("loading");
+  }
+}
+
+document.getElementById("tabs").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  filter = b.dataset.f;
+  document.querySelectorAll("#tabs button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+  renderOrders();
+});
+document.getElementById("q").addEventListener("input", renderOrders);
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>
